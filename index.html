@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修行紀錄助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #fdf6e3;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .card {
+            background: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .reading-area {
+            line-height: 2;
+            letter-spacing: 0.1em;
+            font-size: 1.25rem;
+            white-space: pre-wrap;
+        }
+        .history-list {
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 0.875rem;
+        }
+        /* 自定義滾動條 */
+        .overflow-y-auto::-webkit-scrollbar {
+            width: 4px;
+        }
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+            background-color: #e5e7eb;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div id="app" class="max-w-2xl mx-auto pb-20">
+        <!-- 標題區 -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-yellow-800 mb-2">修行紀錄助手</h1>
+            <p class="text-gray-600">日日修持，念念分明</p>
+        </header>
+
+        <!-- 新增經典區 -->
+        <div class="card p-6 mb-6">
+            <h3 class="font-bold text-gray-700 mb-3 text-lg">新增修持項目</h3>
+            <div class="space-y-3">
+                <input id="newMantra" type="text" placeholder="輸入經典或咒語名稱" 
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                
+                <div class="flex flex-col gap-2">
+                    <label class="text-sm text-gray-500">輸入經文內容 (可選)：</label>
+                    <textarea id="mantraContent" rows="3" placeholder="在此貼入經文內容..." 
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"></textarea>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-400">或上傳文字檔：</span>
+                        <input type="file" id="fileInput" accept=".txt" onchange="handleFileUpload()" class="text-xs text-gray-500">
+                    </div>
+                </div>
+
+                <button onclick="addMantra()" 
+                    class="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-3 rounded-lg font-bold transition-colors">
+                    確認新增
+                </button>
+            </div>
+        </div>
+
+        <!-- 經典列表區 -->
+        <div id="mantraList" class="space-y-4">
+            <!-- 動態插入內容 -->
+        </div>
+
+        <!-- 底部功能 -->
+        <div class="mt-8 text-center space-y-4">
+            <button onclick="confirmClearAll()" class="text-gray-400 hover:text-red-500 text-sm transition-colors">
+                清空所有紀錄
+            </button>
+        </div>
+    </div>
+
+    <!-- 閱讀視窗 Modal -->
+    <div id="readModal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex flex-col items-center justify-center p-4 z-50">
+        <div class="bg-[#fdf6e3] w-full max-w-2xl h-[85vh] rounded-2xl flex flex-col shadow-2xl">
+            <div class="p-4 border-b border-yellow-200 flex justify-between items-center bg-white rounded-t-2xl">
+                <h2 id="readTitle" class="text-xl font-bold text-yellow-900">經文內容</h2>
+                <button onclick="closeReadModal()" class="text-gray-500 hover:text-gray-700 p-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="readBody" class="flex-1 overflow-y-auto p-6 md:p-10 text-gray-800 reading-area">
+                <!-- 經文內容 -->
+            </div>
+            <div class="p-6 border-t border-yellow-200 bg-white rounded-b-2xl">
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-orange-50 p-2 rounded-lg text-center border border-orange-100">
+                        <p class="text-[10px] text-orange-400 uppercase font-bold">今日次數</p>
+                        <p id="readTodayDisplay" class="text-2xl font-bold text-orange-700">0</p>
+                    </div>
+                    <div class="bg-yellow-50 p-2 rounded-lg text-center border border-yellow-100">
+                        <p class="text-[10px] text-yellow-500 uppercase font-bold">累計總額</p>
+                        <p id="readCountDisplay" class="text-2xl font-bold text-yellow-800">0</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <button id="readResetBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-600 p-4 rounded-xl transition-colors" title="重設次數">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </button>
+                    <button id="readAddBtn" class="flex-1 bg-yellow-600 text-white py-4 rounded-full font-bold shadow-lg active:scale-95 transition-transform text-xl">
+                        誦畢 +1
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 確認對話框 -->
+    <div id="confirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-[60]">
+        <div class="bg-white p-6 rounded-2xl max-w-sm w-full shadow-xl text-center">
+            <h3 id="modalTitle" class="text-xl font-bold mb-4">提示</h3>
+            <p id="modalMsg" class="text-gray-600 mb-6"></p>
+            <div class="flex justify-center gap-3">
+                <button onclick="closeConfirmModal()" class="px-6 py-2 text-gray-500 border border-gray-200 rounded-lg">取消</button>
+                <button id="modalConfirmBtn" class="px-6 py-2 bg-red-500 text-white rounded-lg font-bold">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mantras = [];
+        let currentReadId = null;
+
+        // 初始化
+        window.onload = () => {
+            const savedData = localStorage.getItem('myMantraData_v4');
+            if (savedData) {
+                mantras = JSON.parse(savedData);
+            } else {
+                // 預設經典
+                mantras = [
+                    { 
+                        id: Date.now(), 
+                        name: '般若波羅蜜多心經', 
+                        count: 0, 
+                        history: {}, 
+                        content: '觀自在菩薩，行深般若波羅蜜多時，照見五蘊皆空，度一切苦厄...' 
+                    },
+                ];
+            }
+            render();
+        };
+
+        // 取得當前日期字串 (YYYY-MM-DD)
+        function getTodayStr() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        // 渲染畫面
+        function render() {
+            const listElement = document.getElementById('mantraList');
+            const today = getTodayStr();
+            listElement.innerHTML = '';
+
+            mantras.forEach(m => {
+                const todayCount = (m.history && m.history[today]) ? m.history[today] : 0;
+                const historyHtml = m.history ? Object.entries(m.history)
+                    .sort((a, b) => b[0].localeCompare(a[0])) 
+                    .map(([date, val]) => `
+                        <div class="flex justify-between py-1 border-b border-gray-50 last:border-0">
+                            <span class="text-gray-400 font-mono">${date}</span>
+                            <span class="text-gray-700 font-bold">${val} 次</span>
+                        </div>
+                    `).join('') : '';
+
+                const item = document.createElement('div');
+                item.className = 'card overflow-hidden';
+                item.innerHTML = `
+                    <div class="p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div class="flex-1 text-center md:text-left cursor-pointer group w-full" onclick="openReadModal(${m.id})">
+                            <h2 class="text-xl font-bold text-gray-800 group-hover:text-yellow-600 flex items-center justify-center md:justify-start gap-2">
+                                ${m.name}
+                                ${m.content ? '<span class="text-[10px] bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded-full font-normal">有內文</span>' : ''}
+                            </h2>
+                            <div class="flex flex-wrap justify-center md:justify-start gap-4 mt-2">
+                                <div class="text-sm text-gray-500">今日：<span class="text-orange-600 font-bold">${todayCount}</span></div>
+                                <div class="text-sm text-gray-500">總累計：<span class="text-yellow-700 font-bold font-mono">${m.count}</span></div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button onclick="updateCount(${m.id}, -1); event.stopPropagation();" class="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-500">-</button>
+                            
+                            <button onclick="updateCount(${m.id}, 1); event.stopPropagation();" class="bg-yellow-600 hover:bg-yellow-700 text-white px-6 h-12 rounded-xl flex items-center justify-center transition-transform active:scale-95 shadow-md font-bold">
+                                +1 紀錄
+                            </button>
+
+                            <button onclick="toggleHistory(${m.id}); event.stopPropagation();" class="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-400" title="歷史明細">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                            </button>
+                            
+                            <button onclick="resetCount(${m.id}); event.stopPropagation();" class="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center hover:text-red-500 text-gray-300 transition-colors" title="歸零">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            </button>
+
+                            <button onclick="deleteMantra(${m.id}); event.stopPropagation();" class="text-gray-200 hover:text-red-400 p-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="hist-${m.id}" class="hidden bg-gray-50 px-6 pb-6 pt-2 border-t border-gray-100">
+                        <h4 class="text-xs font-bold text-gray-400 mb-2">歷史紀錄 (按日期)</h4>
+                        <div class="history-list px-2">
+                            ${historyHtml || '<p class="text-center text-gray-300 py-4">尚無紀錄</p>'}
+                        </div>
+                    </div>
+                `;
+                listElement.appendChild(item);
+            });
+            save();
+        }
+
+        // 切換顯示歷史紀錄
+        function toggleHistory(id) {
+            const el = document.getElementById(`hist-${id}`);
+            el.classList.toggle('hidden');
+        }
+
+        // 處理經文文字檔上傳
+        function handleFileUpload() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('mantraContent').value = e.target.result;
+            };
+            reader.readAsText(file);
+        }
+
+        // 新增經典
+        function addMantra() {
+            const nameInput = document.getElementById('newMantra');
+            const contentInput = document.getElementById('mantraContent');
+            const fileInput = document.getElementById('fileInput');
+
+            if (nameInput.value.trim()) {
+                mantras.push({
+                    id: Date.now(),
+                    name: nameInput.value.trim(),
+                    content: contentInput.value.trim(),
+                    count: 0,
+                    history: {}
+                });
+                nameInput.value = '';
+                contentInput.value = '';
+                fileInput.value = '';
+                render();
+            }
+        }
+
+        // 更新計數 (包含歷史)
+        function updateCount(id, delta) {
+            const index = mantras.findIndex(m => m.id === id);
+            if (index !== -1) {
+                const today = getTodayStr();
+                const m = mantras[index];
+                if (!m.history) m.history = {};
+                m.count = Math.max(0, m.count + delta);
+                if (!m.history[today]) m.history[today] = 0;
+                m.history[today] = Math.max(0, m.history[today] + delta);
+                if (m.history[today] === 0) delete m.history[today];
+                if (currentReadId === id) {
+                    document.getElementById('readCountDisplay').innerText = m.count;
+                    document.getElementById('readTodayDisplay').innerText = m.history[today] || 0;
+                }
+                render();
+            }
+        }
+
+        // 歸零單個經典
+        function resetCount(id) {
+            const m = mantras.find(item => item.id === id);
+            if (!m) return;
+            showConfirmModal("歸零確認", `確定要將「${m.name}」的所有累計與歷史紀錄歸零重置嗎？`, () => {
+                const index = mantras.findIndex(item => item.id === id);
+                mantras[index].count = 0;
+                mantras[index].history = {};
+                if (currentReadId === id) {
+                    document.getElementById('readCountDisplay').innerText = 0;
+                    document.getElementById('readTodayDisplay').innerText = 0;
+                }
+                render();
+                closeConfirmModal();
+            });
+        }
+
+        // 打開閱讀模式
+        function openReadModal(id) {
+            const m = mantras.find(item => item.id === id);
+            if (!m) return;
+            const today = getTodayStr();
+            currentReadId = id;
+            document.getElementById('readTitle').innerText = m.name;
+            document.getElementById('readBody').innerText = m.content || "尚無上傳經文內容。";
+            document.getElementById('readCountDisplay').innerText = m.count;
+            document.getElementById('readTodayDisplay').innerText = (m.history && m.history[today]) ? m.history[today] : 0;
+            document.getElementById('readAddBtn').onclick = () => updateCount(id, 1);
+            document.getElementById('readResetBtn').onclick = () => resetCount(id);
+            document.getElementById('readModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        // 關閉閱讀模式
+        function closeReadModal() {
+            document.getElementById('readModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+            currentReadId = null;
+        }
+
+        // 刪除經典
+        function deleteMantra(id) {
+            showConfirmModal("刪除確認", "確定要移除這部經典嗎？所有歷史數據將會消失。", () => {
+                mantras = mantras.filter(m => m.id !== id);
+                render();
+                closeConfirmModal();
+            });
+        }
+
+        // 清空所有資料
+        function confirmClearAll() {
+            showConfirmModal("全部重置", "這將會清空所有項目及其歷史統計，確定嗎？", () => {
+                mantras = [];
+                render();
+                closeConfirmModal();
+            });
+        }
+
+        // 儲存到 localStorage
+        function save() {
+            localStorage.setItem('myMantraData_v4', JSON.stringify(mantras));
+        }
+
+        // 通用確認視窗顯示
+        function showConfirmModal(title, msg, onConfirm) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMsg').innerText = msg;
+            document.getElementById('modalConfirmBtn').onclick = onConfirm;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        // 通用確認視窗關閉
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
