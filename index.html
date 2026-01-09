@@ -2,13 +2,21 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>誦經紀錄助手</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>修行紀錄助手</title>
+    
+    <!-- 手機 APP 模式設定 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="修行紀錄">
+    <meta name="mobile-web-app-capable" content="yes">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             background-color: #fdf6e3;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent; 
         }
         .card {
             background: #ffffff;
@@ -16,7 +24,7 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
         .reading-area {
-            line-height: 2;
+            line-height: 2.2;
             letter-spacing: 0.1em;
             font-size: 1.25rem;
             white-space: pre-wrap;
@@ -26,7 +34,6 @@
             overflow-y: auto;
             font-size: 0.875rem;
         }
-        /* 自定義滾動條 */
         .overflow-y-auto::-webkit-scrollbar {
             width: 4px;
         }
@@ -34,17 +41,30 @@
             background-color: #e5e7eb;
             border-radius: 10px;
         }
+        .no-select {
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        /* 朗讀中動畫 */
+        @keyframes pulse-gold {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .is-speaking {
+            animation: pulse-gold 2s infinite;
+            color: #d97706 !important;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
     <div id="app" class="max-w-2xl mx-auto pb-20">
-        <!-- 標題區 -->
-        <header class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-yellow-800 mb-2">誦經紀錄助手</h1>
+        <header class="text-center mb-8 pt-4">
+            <h1 class="text-3xl font-bold text-yellow-800 mb-2">修行紀錄助手</h1>
             <p class="text-gray-600">日日修持，念念分明</p>
         </header>
 
-        <!-- 新增經典區 -->
+        <!-- 新增區 -->
         <div class="card p-6 mb-6">
             <h3 class="font-bold text-gray-700 mb-3 text-lg">新增修持項目</h3>
             <div class="space-y-3">
@@ -52,12 +72,11 @@
                     class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
                 
                 <div class="flex flex-col gap-2">
-                    <label class="text-sm text-gray-500">輸入經文內容 (可選)：</label>
-                    <textarea id="mantraContent" rows="3" placeholder="在此貼入經文內容..." 
+                    <textarea id="mantraContent" rows="3" placeholder="在此貼入經文內容 (選填)..." 
                         class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"></textarea>
                     <div class="flex items-center gap-2">
                         <span class="text-xs text-gray-400">或上傳文字檔：</span>
-                        <input type="file" id="fileInput" accept=".txt" onchange="handleFileUpload()" class="text-xs text-gray-500">
+                        <input type="file" id="fileInput" accept=".txt" onchange="handleFileUpload('mantraContent', 'fileInput')" class="text-xs text-gray-500">
                     </div>
                 </div>
 
@@ -68,12 +87,9 @@
             </div>
         </div>
 
-        <!-- 經典列表區 -->
-        <div id="mantraList" class="space-y-4">
-            <!-- 動態插入內容 -->
-        </div>
+        <!-- 列表區 -->
+        <div id="mantraList" class="space-y-4"></div>
 
-        <!-- 底部功能 -->
         <div class="mt-8 text-center space-y-4">
             <button onclick="confirmClearAll()" class="text-gray-400 hover:text-red-500 text-sm transition-colors">
                 清空所有紀錄
@@ -81,19 +97,51 @@
         </div>
     </div>
 
-    <!-- 閱讀視窗 Modal -->
+    <!-- 編輯視窗 Modal -->
+    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-[60]">
+        <div class="bg-white p-6 rounded-2xl max-w-lg w-full shadow-xl">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">編輯修持項目</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-sm text-gray-500 block mb-1">名稱</label>
+                    <input id="editName" type="text" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-500 block mb-1">內容</label>
+                    <textarea id="editContent" rows="6" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"></textarea>
+                    <div class="flex items-center gap-2 mt-2">
+                        <span class="text-xs text-gray-400">更換檔案：</span>
+                        <input type="file" id="editFileInput" accept=".txt" onchange="handleFileUpload('editContent', 'editFileInput')" class="text-xs text-gray-500">
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeEditModal()" class="px-6 py-2 text-gray-500 border border-gray-200 rounded-lg">取消</button>
+                <button id="saveEditBtn" class="px-6 py-2 bg-yellow-600 text-white rounded-lg font-bold">儲存修改</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 閱讀與有聲書視窗 Modal -->
     <div id="readModal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex flex-col items-center justify-center p-4 z-50">
-        <div class="bg-[#fdf6e3] w-full max-w-2xl h-[85vh] rounded-2xl flex flex-col shadow-2xl">
-            <div class="p-4 border-b border-yellow-200 flex justify-between items-center bg-white rounded-t-2xl">
-                <h2 id="readTitle" class="text-xl font-bold text-yellow-900">經文內容</h2>
+        <div class="bg-[#fdf6e3] w-full max-w-2xl h-[90vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 border-b border-yellow-200 flex justify-between items-center bg-white">
+                <div class="flex items-center gap-3">
+                    <h2 id="readTitle" class="text-xl font-bold text-yellow-900">經文內容</h2>
+                    <!-- 朗讀按鈕 -->
+                    <button id="ttsBtn" onclick="toggleTTS()" class="flex items-center gap-1 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-sm font-medium border border-yellow-100 hover:bg-yellow-100 transition-colors">
+                        <span id="ttsIcon">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071a1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243a1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828a1 1 0 010-1.415z" clip-rule="evenodd"></path></svg>
+                        </span>
+                        <span id="ttsText">朗讀經文</span>
+                    </button>
+                </div>
                 <button onclick="closeReadModal()" class="text-gray-500 hover:text-gray-700 p-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
-            <div id="readBody" class="flex-1 overflow-y-auto p-6 md:p-10 text-gray-800 reading-area">
-                <!-- 經文內容 -->
-            </div>
-            <div class="p-6 border-t border-yellow-200 bg-white rounded-b-2xl">
+            <div id="readBody" class="flex-1 overflow-y-auto p-6 md:p-10 text-gray-800 reading-area"></div>
+            <div class="p-6 border-t border-yellow-200 bg-white">
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <div class="bg-orange-50 p-2 rounded-lg text-center border border-orange-100">
                         <p class="text-[10px] text-orange-400 uppercase font-bold">今日次數</p>
@@ -104,12 +152,11 @@
                         <p id="readCountDisplay" class="text-2xl font-bold text-yellow-800">0</p>
                     </div>
                 </div>
-                
                 <div class="flex items-center gap-4">
-                    <button id="readResetBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-600 p-4 rounded-xl transition-colors" title="重設次數">
+                    <button id="readResetBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-600 p-4 rounded-xl transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     </button>
-                    <button id="readAddBtn" class="flex-1 bg-yellow-600 text-white py-4 rounded-full font-bold shadow-lg active:scale-95 transition-transform text-xl">
+                    <button id="readAddBtn" class="flex-1 bg-yellow-600 text-white py-4 rounded-full font-bold shadow-lg active:scale-95 transition-transform text-xl no-select">
                         誦畢 +1
                     </button>
                 </div>
@@ -117,7 +164,7 @@
         </div>
     </div>
 
-    <!-- 確認對話框 -->
+    <!-- 確認視窗 -->
     <div id="confirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-[60]">
         <div class="bg-white p-6 rounded-2xl max-w-sm w-full shadow-xl text-center">
             <h3 id="modalTitle" class="text-xl font-bold mb-4">提示</h3>
@@ -132,37 +179,31 @@
     <script>
         let mantras = [];
         let currentReadId = null;
+        let synth = window.speechSynthesis;
+        let utterance = null;
+        let isSpeaking = false;
 
-        // 初始化
         window.onload = () => {
             const savedData = localStorage.getItem('myMantraData_v4');
             if (savedData) {
                 mantras = JSON.parse(savedData);
             } else {
-                // 預設經典
-                mantras = [
-                    { 
-                        id: Date.now(), 
-                        name: '般若波羅蜜多心經', 
-                        count: 0, 
-                        history: {}, 
-                        content: '觀自在菩薩，行深般若波羅蜜多時，照見五蘊皆空，度一切苦厄...' 
-                    },
-                ];
+                mantras = [{ 
+                    id: Date.now(), 
+                    name: '般若波羅蜜多心經', 
+                    count: 0, 
+                    history: {}, 
+                    content: '觀自在菩薩，行深般若波羅蜜多時，照見五蘊皆空，度一切苦厄。舍利子，色不異空，空不異色，色即是空，空即是色，受想行識，亦復如是。' 
+                }];
             }
             render();
         };
 
-        // 取得當前日期字串 (YYYY-MM-DD)
         function getTodayStr() {
             const now = new Date();
-            const y = now.getFullYear();
-            const m = String(now.getMonth() + 1).padStart(2, '0');
-            const d = String(now.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         }
 
-        // 渲染畫面
         function render() {
             const listElement = document.getElementById('mantraList');
             const today = getTodayStr();
@@ -186,40 +227,33 @@
                         <div class="flex-1 text-center md:text-left cursor-pointer group w-full" onclick="openReadModal(${m.id})">
                             <h2 class="text-xl font-bold text-gray-800 group-hover:text-yellow-600 flex items-center justify-center md:justify-start gap-2">
                                 ${m.name}
-                                ${m.content ? '<span class="text-[10px] bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded-full font-normal">有內文</span>' : ''}
+                                ${m.content ? '<span class="text-[10px] bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded-full font-normal">可朗讀</span>' : ''}
                             </h2>
                             <div class="flex flex-wrap justify-center md:justify-start gap-4 mt-2">
                                 <div class="text-sm text-gray-500">今日：<span class="text-orange-600 font-bold">${todayCount}</span></div>
                                 <div class="text-sm text-gray-500">總累計：<span class="text-yellow-700 font-bold font-mono">${m.count}</span></div>
                             </div>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <button onclick="updateCount(${m.id}, -1); event.stopPropagation();" class="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-500">-</button>
+                        <div class="flex items-center gap-2">
+                            <button onclick="updateCount(${m.id}, 1); event.stopPropagation();" class="bg-yellow-600 hover:bg-yellow-700 text-white px-5 h-12 rounded-xl flex items-center justify-center transition-transform active:scale-95 shadow-md font-bold no-select">
+                                +1
+                            </button>
                             
-                            <button onclick="updateCount(${m.id}, 1); event.stopPropagation();" class="bg-yellow-600 hover:bg-yellow-700 text-white px-6 h-12 rounded-xl flex items-center justify-center transition-transform active:scale-95 shadow-md font-bold">
-                                +1 紀錄
+                            <button onclick="openEditModal(${m.id}); event.stopPropagation();" class="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-400" title="編輯">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                             </button>
 
-                            <button onclick="toggleHistory(${m.id}); event.stopPropagation();" class="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-400" title="歷史明細">
+                            <button onclick="toggleHistory(${m.id}); event.stopPropagation();" class="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-400">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-                            </button>
-                            
-                            <button onclick="resetCount(${m.id}); event.stopPropagation();" class="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center hover:text-red-500 text-gray-300 transition-colors" title="歸零">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                             </button>
 
                             <button onclick="deleteMantra(${m.id}); event.stopPropagation();" class="text-gray-200 hover:text-red-400 p-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             </button>
                         </div>
                     </div>
                     <div id="hist-${m.id}" class="hidden bg-gray-50 px-6 pb-6 pt-2 border-t border-gray-100">
-                        <h4 class="text-xs font-bold text-gray-400 mb-2">歷史紀錄 (按日期)</h4>
-                        <div class="history-list px-2">
-                            ${historyHtml || '<p class="text-center text-gray-300 py-4">尚無紀錄</p>'}
-                        </div>
+                        <div class="history-list px-2">${historyHtml || '<p class="text-center text-gray-300 py-4">尚無紀錄</p>'}</div>
                     </div>
                 `;
                 listElement.appendChild(item);
@@ -227,29 +261,19 @@
             save();
         }
 
-        // 切換顯示歷史紀錄
-        function toggleHistory(id) {
-            const el = document.getElementById(`hist-${id}`);
-            el.classList.toggle('hidden');
-        }
-
-        // 處理經文文字檔上傳
-        function handleFileUpload() {
-            const file = document.getElementById('fileInput').files[0];
+        function handleFileUpload(textareaId, inputId) {
+            const file = document.getElementById(inputId).files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (e) => {
-                document.getElementById('mantraContent').value = e.target.result;
+                document.getElementById(textareaId).value = e.target.result;
             };
             reader.readAsText(file);
         }
 
-        // 新增經典
         function addMantra() {
             const nameInput = document.getElementById('newMantra');
             const contentInput = document.getElementById('mantraContent');
-            const fileInput = document.getElementById('fileInput');
-
             if (nameInput.value.trim()) {
                 mantras.push({
                     id: Date.now(),
@@ -260,12 +284,39 @@
                 });
                 nameInput.value = '';
                 contentInput.value = '';
-                fileInput.value = '';
+                document.getElementById('fileInput').value = '';
                 render();
             }
         }
 
-        // 更新計數 (包含歷史)
+        function openEditModal(id) {
+            const m = mantras.find(item => item.id === id);
+            if (!m) return;
+            document.getElementById('editName').value = m.name;
+            document.getElementById('editContent').value = m.content || "";
+            document.getElementById('saveEditBtn').onclick = () => saveEdit(id);
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+            document.getElementById('editFileInput').value = '';
+        }
+
+        function saveEdit(id) {
+            const index = mantras.findIndex(m => m.id === id);
+            if (index !== -1) {
+                mantras[index].name = document.getElementById('editName').value.trim();
+                mantras[index].content = document.getElementById('editContent').value.trim();
+                render();
+                closeEditModal();
+                if (currentReadId === id) {
+                    document.getElementById('readTitle').innerText = mantras[index].name;
+                    document.getElementById('readBody').innerText = mantras[index].content || "尚無內文";
+                }
+            }
+        }
+
         function updateCount(id, delta) {
             const index = mantras.findIndex(m => m.id === id);
             if (index !== -1) {
@@ -273,9 +324,9 @@
                 const m = mantras[index];
                 if (!m.history) m.history = {};
                 m.count = Math.max(0, m.count + delta);
-                if (!m.history[today]) m.history[today] = 0;
-                m.history[today] = Math.max(0, m.history[today] + delta);
-                if (m.history[today] === 0) delete m.history[today];
+                m.history[today] = Math.max(0, (m.history[today] || 0) + delta);
+                if (m.history[today] <= 0) delete m.history[today];
+                
                 if (currentReadId === id) {
                     document.getElementById('readCountDisplay').innerText = m.count;
                     document.getElementById('readTodayDisplay').innerText = m.history[today] || 0;
@@ -284,70 +335,125 @@
             }
         }
 
-        // 歸零單個經典
-        function resetCount(id) {
-            const m = mantras.find(item => item.id === id);
-            if (!m) return;
-            showConfirmModal("歸零確認", `確定要將「${m.name}」的所有累計與歷史紀錄歸零重置嗎？`, () => {
-                const index = mantras.findIndex(item => item.id === id);
-                mantras[index].count = 0;
-                mantras[index].history = {};
-                if (currentReadId === id) {
-                    document.getElementById('readCountDisplay').innerText = 0;
-                    document.getElementById('readTodayDisplay').innerText = 0;
-                }
-                render();
-                closeConfirmModal();
-            });
+        // 有聲書相關邏輯
+        function toggleTTS() {
+            if (isSpeaking) {
+                stopTTS();
+            } else {
+                startTTS();
+            }
         }
 
-        // 打開閱讀模式
+        function startTTS() {
+            const text = document.getElementById('readBody').innerText;
+            if (!text || text.includes("尚無經文內容")) return;
+
+            // 停止之前的朗讀
+            synth.cancel();
+
+            utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-TW';
+            utterance.rate = 0.9; // 稍微放慢一點點
+
+            utterance.onstart = () => {
+                isSpeaking = true;
+                updateTTSUI();
+            };
+            utterance.onend = () => {
+                isSpeaking = false;
+                updateTTSUI();
+            };
+            utterance.onerror = () => {
+                isSpeaking = false;
+                updateTTSUI();
+            };
+
+            synth.speak(utterance);
+        }
+
+        function stopTTS() {
+            synth.cancel();
+            isSpeaking = false;
+            updateTTSUI();
+        }
+
+        function updateTTSUI() {
+            const btn = document.getElementById('ttsBtn');
+            const icon = document.getElementById('ttsIcon');
+            const textSpan = document.getElementById('ttsText');
+
+            if (isSpeaking) {
+                icon.classList.add('is-speaking');
+                textSpan.innerText = '停止朗讀';
+                btn.classList.add('bg-orange-100');
+            } else {
+                icon.classList.remove('is-speaking');
+                textSpan.innerText = '朗讀經文';
+                btn.classList.remove('bg-orange-100');
+            }
+        }
+
         function openReadModal(id) {
             const m = mantras.find(item => item.id === id);
             if (!m) return;
             const today = getTodayStr();
             currentReadId = id;
             document.getElementById('readTitle').innerText = m.name;
-            document.getElementById('readBody').innerText = m.content || "尚無上傳經文內容。";
+            document.getElementById('readBody').innerText = m.content || "尚無經文內容，可點擊編輯按鈕新增。";
             document.getElementById('readCountDisplay').innerText = m.count;
             document.getElementById('readTodayDisplay').innerText = (m.history && m.history[today]) ? m.history[today] : 0;
             document.getElementById('readAddBtn').onclick = () => updateCount(id, 1);
             document.getElementById('readResetBtn').onclick = () => resetCount(id);
             document.getElementById('readModal').classList.remove('hidden');
             document.body.style.overflow = 'hidden';
+            
+            // 根據有無內容顯示朗讀按鈕
+            document.getElementById('ttsBtn').style.display = m.content ? 'flex' : 'none';
         }
 
-        // 關閉閱讀模式
         function closeReadModal() {
+            stopTTS();
             document.getElementById('readModal').classList.add('hidden');
             document.body.style.overflow = 'auto';
             currentReadId = null;
         }
 
-        // 刪除經典
+        function resetCount(id) {
+            const m = mantras.find(item => item.id === id);
+            if (!m) return;
+            showConfirmModal("歸零確認", `確定重置「${m.name}」的紀錄嗎？`, () => {
+                const index = mantras.findIndex(item => item.id === id);
+                mantras[index].count = 0;
+                mantras[index].history = {};
+                render();
+                closeConfirmModal();
+            });
+        }
+
         function deleteMantra(id) {
-            showConfirmModal("刪除確認", "確定要移除這部經典嗎？所有歷史數據將會消失。", () => {
+            showConfirmModal("刪除確認", "確定要移除這部經典嗎？", () => {
                 mantras = mantras.filter(m => m.id !== id);
                 render();
                 closeConfirmModal();
             });
         }
 
-        // 清空所有資料
         function confirmClearAll() {
-            showConfirmModal("全部重置", "這將會清空所有項目及其歷史統計，確定嗎？", () => {
+            showConfirmModal("全部重置", "確定要清空所有資料嗎？", () => {
                 mantras = [];
                 render();
                 closeConfirmModal();
             });
         }
 
-        // 儲存到 localStorage
+        function toggleHistory(id) {
+            document.getElementById(`hist-${id}`).classList.toggle('hidden');
+        }
+
         function save() {
             localStorage.setItem('myMantraData_v4', JSON.stringify(mantras));
         }
 
-        // 通用確認視窗顯示
         function showConfirmModal(title, msg, onConfirm) {
             document.getElementById('modalTitle').innerText = title;
             document.getElementById('modalMsg').innerText = msg;
@@ -355,11 +461,9 @@
             document.getElementById('confirmModal').classList.remove('hidden');
         }
 
-        // 通用確認視窗關閉
         function closeConfirmModal() {
             document.getElementById('confirmModal').classList.add('hidden');
         }
     </script>
 </body>
-
 </html>
